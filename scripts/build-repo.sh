@@ -64,5 +64,5 @@ log "Updating repository database"
 shopt -s nullglob
 pkgs=("$REPO_DIR"/*.pkg.tar.zst)
 (( ${#pkgs[@]} )) || { echo "no packages built" >&2; exit 1; }
-repo-add --new --remove "${SIGN[@]}" "$REPO_DIR/devos.db.tar.zst" "${pkgs[@]}" >/dev/null
+repo-add --remove "${SIGN[@]}" "$REPO_DIR/devos.db.tar.zst" "${pkgs[@]}" >/dev/null
 log "Repository: $REPO_DIR (${#pkgs[@]} packages: ${built[*]})"

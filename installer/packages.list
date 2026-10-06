@@ -1,0 +1,35 @@
+# Packages devos-install puts on every installed system (SRS INST-004).
+# Also the input for the ISO's offline package cache (scripts/build-iso.sh),
+# so offline installs always have exactly these packages and their dependencies.
+# Optional developer profiles are installed from the network.
+
+# Base system
+base
+linux
+linux-firmware
+sof-firmware
+intel-ucode
+amd-ucode
+mkinitcpio
+sudo
+zsh
+less
+neovim
+man-db
+man-pages
+
+# Network, boot, storage
+networkmanager
+openssh
+grub
+efibootmgr
+os-prober
+dosfstools
+e2fsprogs
+cryptsetup
+
+# DevOS ([devos] repository)
+devos-desktop
+devos-ai
+devos-grub-theme
+devos-profile-general

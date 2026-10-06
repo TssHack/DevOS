@@ -15,10 +15,11 @@ set -euo pipefail
 TARGET=/mnt
 LOG=/tmp/devos-install.log
 DEVOS_GRUB_DEFAULTS=/usr/share/devos/grub/default-grub
-BASE_PACKAGES=(base linux linux-firmware sof-firmware intel-ucode amd-ucode mkinitcpio sudo
-               networkmanager openssh grub efibootmgr os-prober dosfstools e2fsprogs cryptsetup
-               man-db man-pages less neovim zsh)
-DEVOS_PACKAGES=(devos-desktop devos-ai devos-grub-theme devos-profile-general)
+# Package set: one list shared with the ISO's offline cache (installer/packages.list).
+PACKAGE_LIST=/usr/share/devos-installer/packages.list
+[[ -r "$PACKAGE_LIST" ]] || PACKAGE_LIST="$(dirname "$(readlink -f "$0")")/packages.list"
+mapfile -t INSTALL_PACKAGES < <(grep -vE '^\s*(#|$)' "$PACKAGE_LIST")
+mapfile -t DEVOS_PACKAGES < <(printf '%s\n' "${INSTALL_PACKAGES[@]}" | grep '^devos-')
 
 # Settings (interactive answers or --config). Passwords are never logged.
 DISK="" HOSTNAME_="devos" USERNAME="" PASSWORD="" PASSWORD_HASH="" TIMEZONE="UTC"
@@ -39,6 +40,10 @@ preflight() {
 }
 
 check_network() {
+    # The DevOS ISO carries every package it installs; only extra profiles need the network.
+    if [[ -f /opt/offline-repo/core.db && -z "$PROFILES" ]]; then
+        return
+    fi
     curl -fsS --max-time 10 -o /dev/null https://archlinux.org || \
         die "no network connection. Connect first (Wi-Fi: nmtui), then run devos-install again."
 }
@@ -159,7 +164,9 @@ install_base() {
     log "Installing packages (this takes a while)"
     local profiles=() p
     for p in $PROFILES; do profiles+=("devos-profile-$p"); done
-    run pacstrap -K "$TARGET" "${BASE_PACKAGES[@]}" "${DEVOS_PACKAGES[@]}" "${profiles[@]}"
+    # The live keyring (populated at boot) verifies packages and is copied to the target;
+    # -K would start from an empty keyring and need the network to fetch keys.
+    run pacstrap "$TARGET" "${INSTALL_PACKAGES[@]}" "${profiles[@]}"
     install_pacman_conf
     genfstab -U "$TARGET" >>"$TARGET/etc/fstab"
 }
@@ -226,11 +233,14 @@ install_bootloader() {
 install_pacman_conf() {
     local url=""
     [[ -r /etc/devos/repo-url ]] && url="$(head -1 /etc/devos/repo-url)"
+    # The ISO's offline package cache does not exist on the installed system.
+    local conf
+    conf="$(sed '\|^Server = file:///opt/offline-repo$|d' /etc/pacman.conf)"
     if [[ -n "$url" ]]; then
-        sed "s|^Server = file:///opt/devos-repo$|Server = $url|" /etc/pacman.conf >"$TARGET/etc/pacman.conf"
+        sed "s|^Server = file:///opt/devos-repo$|Server = $url|" <<<"$conf" >"$TARGET/etc/pacman.conf"
     else
         # No published repository yet: keep the installed system on the official repos only.
-        sed '/^\[devos\]/,/^$/d' /etc/pacman.conf >"$TARGET/etc/pacman.conf"
+        sed '/^\[devos\]/,/^$/d' <<<"$conf" >"$TARGET/etc/pacman.conf"
     fi
 }
 

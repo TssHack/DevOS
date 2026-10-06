@@ -14,5 +14,6 @@ source=()
 
 package() {
     install -Dm755 "$startdir/../../installer/devos-install" "$pkgdir/usr/bin/devos-install"
+    install -Dm644 "$startdir/../../installer/packages.list" "$pkgdir/usr/share/devos-installer/packages.list"
     install -Dm644 "$startdir/../../installer/example.conf" "$pkgdir/usr/share/doc/devos-installer/example.conf"
 }

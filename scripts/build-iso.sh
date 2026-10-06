@@ -3,7 +3,7 @@
 #
 # Usage: sudo scripts/build-iso.sh [-o OUTPUT_DIR] [-w WORK_DIR] [-k]
 #   -o  output directory (default: dist/)
-#   -w  work directory   (default: work/)
+#   -w  work directory   (default: work/iso)
 #   -k  keep the work directory after the build
 #
 # Output: dist/devos-<VERSION>-x86_64.iso and its .sha256
@@ -12,12 +12,14 @@
 # Environment:
 #   DEVOS_REPO_DIR  local [devos] repository (default: repo/x86_64)
 #   DEVOS_REPO_URL  published [devos] URL for installed systems (optional; see OS-011)
+#   DEVOS_OFFLINE   1 (default): put every package of installer/packages.list on the ISO
+#   DEVOS_PKG_CACHE download cache kept between builds (default: work/pkgcache)
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT_DIR="$ROOT/dist"
-WORK_DIR="$ROOT/work"
+WORK_DIR="$ROOT/work/iso"
 KEEP_WORK=false
 
 log() { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
@@ -74,6 +76,42 @@ cp -- "$REPO_DIR"/devos.db* "$REPO_DIR"/devos.files* "$REPO_DIR"/*.pkg.tar.zst "
 { cat "$ROOT/iso/pacman.conf"; printf '\n%s\nServer = file:///opt/devos-repo\n' "$DEVOS_REPO_CONF"; } \
     >"$PROFILE/airootfs/etc/pacman.conf"
 [[ -n "${DEVOS_REPO_URL:-}" ]] && echo "$DEVOS_REPO_URL" >"$PROFILE/airootfs/etc/devos/repo-url"
+
+# Offline install: the packages the installer needs, plus the signed official
+# databases from the same moment, so pacman verifies every package offline
+# exactly as it would online. Listed first; the mirrors remain the fallback.
+if [[ "${DEVOS_OFFLINE:-1}" == 1 ]]; then
+    log "Building the offline package cache"
+    OFF="$PROFILE/airootfs/opt/offline-repo"
+    DB="$WORK_DIR/offline-db"
+    CACHE="$(realpath -m "${DEVOS_PKG_CACHE:-$ROOT/work/pkgcache}")"
+    install -d "$OFF" "$DB" "$CACHE"
+    mapfile -t pkgs < <(grep -vE '^\s*(#|$)' "$ROOT/installer/packages.list")
+    pac=(pacman --noconfirm --config "$PROFILE/pacman.conf" --dbpath "$DB" --cachedir "$CACHE")
+    "${pac[@]}" -Sy >/dev/null
+    # Arch databases no longer embed signatures: each package needs its .sig.
+    # Re-fetch cached packages whose signature download failed earlier.
+    for f in "$CACHE"/*.pkg.tar.zst; do
+        [[ -e "$f" && ! -e "$f.sig" ]] && rm -f -- "$f"
+    done
+    for attempt in 1 2 3 4 5; do
+        "${pac[@]}" -Sw "${pkgs[@]}" >/dev/null && break
+        (( attempt < 5 )) || die "downloading the offline packages failed"
+        log "Download failed, retrying ($attempt/5)"
+        sleep 5
+    done
+    # Copy exactly the resolved set; [devos] packages are already on the ISO.
+    while read -r repo file; do
+        [[ "$repo" == devos ]] && continue
+        pkg="$CACHE/$file"
+        [[ -f "$pkg.sig" ]] || die "missing signature for $file; run the build again"
+        cp -- "$pkg" "$pkg.sig" "$OFF/"
+    done < <("${pac[@]}" -Sp --print-format '%r %f' "${pkgs[@]}")
+    cp -- "$DB/sync/core.db" "$DB/sync/extra.db" "$OFF/"
+    sed -i -e '/^\[core\]$/a Server = file:///opt/offline-repo' \
+           -e '/^\[extra\]$/a Server = file:///opt/offline-repo' "$PROFILE/airootfs/etc/pacman.conf"
+    log "Offline cache: $(find "$OFF" -name '*.pkg.tar.zst' | wc -l) packages, $(du -sh "$OFF" | cut -f1)"
+fi
 
 log "Building DevOS $DEVOS_VERSION"
 mkarchiso -v -w "$WORK_DIR/build" -o "$OUT_DIR" "$PROFILE"
