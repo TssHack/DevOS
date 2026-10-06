@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=DevOS AI
+Comment=AI assistant and agent for your projects
+Exec=qs -p /usr/share/devos/shell ipc call devos-ai open
+Icon=utilities-terminal
+Categories=Development;
+Keywords=ai;gemini;agent;assistant;

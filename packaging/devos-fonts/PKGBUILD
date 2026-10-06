@@ -1,0 +1,37 @@
+# Maintainer: Ehsan Fazli
+# Fonts the DevOS desktop (end-4) and DevOS shell use that are not in the official
+# repositories: Material Symbols Rounded, Rubik, Readex Pro, Space Grotesk (OFL-1.1 / Apache-2.0).
+#
+# Sources are pinned to upstream commits and sha256 checksums (SRS BLD-006).
+# To update: change the commits, then run `updpkgsums`.
+
+_gfonts='7085eb89a950e85db5b166b7a58d414544b4140c'  # commit of https://github.com/google/fonts
+_msymbols='737e3324305806514d7909874fa1818ae1808232'  # commit of https://github.com/google/material-design-icons
+pkgname=devos-fonts
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Fonts for the DevOS desktop'
+arch=('any')
+url='https://github.com/DevOS'
+license=('OFL-1.1' 'Apache-2.0')
+_gf="https://raw.githubusercontent.com/google/fonts/$_gfonts/ofl"
+_ms="https://raw.githubusercontent.com/google/material-design-icons/$_msymbols/variablefont"
+source=("Rubik[wght].ttf::$_gf/rubik/Rubik%5Bwght%5D.ttf"
+        "Rubik-Italic[wght].ttf::$_gf/rubik/Rubik-Italic%5Bwght%5D.ttf"
+        "ReadexPro[HEXP,wght].ttf::$_gf/readexpro/ReadexPro%5BHEXP,wght%5D.ttf"
+        "SpaceGrotesk[wght].ttf::$_gf/spacegrotesk/SpaceGrotesk%5Bwght%5D.ttf"
+        "MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf::$_ms/MaterialSymbolsRounded%5BFILL,GRAD,opsz,wght%5D.ttf"
+        "MaterialSymbolsOutlined[FILL,GRAD,opsz,wght].ttf::$_ms/MaterialSymbolsOutlined%5BFILL,GRAD,opsz,wght%5D.ttf")
+sha256sums=('1b3a7437ba2af80e465e773ed60c5036d1ba6ace492d89046dbcf18fb31e4e88'
+            '08c6c4018a5ada8b517407b46897e46cf6ebb106853fbd3e89addb51d3b59c62'
+            '268bba7e1e8f3b14d798b3fb0e40ebaa3fc39308c9ac0020e2faf6df181cc30e'
+            'acad6de1fc93436f5c0f1f4137751ef04f1aea3063e7036535970ffcfbd79f72'
+            '95b24392bb49efd1bc3e92cff4e2452ad094461bab7c97e7d8723fab97e330ca'
+            '5ca6cdf74da4018e8a7687995c9e392b1a7ec49588fade2be3a97a2a06dd3262')
+
+package() {
+    install -d "$pkgdir/usr/share/fonts/devos"
+    for src in "${source[@]}"; do
+        install -m644 "$srcdir/${src%%::*}" "$pkgdir/usr/share/fonts/devos/"
+    done
+}

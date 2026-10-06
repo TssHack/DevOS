@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=DevOS Welcome
+Comment=Developer profiles and AI setup
+Exec=qs -p /usr/share/devos/shell ipc call devos welcome
+Icon=system-software-install
+Categories=Settings;

@@ -1,0 +1,64 @@
+# Maintainer: Ehsan Fazli
+# DevOS desktop: end-4 (illogical-impulse) on Hyprland at a pinned commit, plus the
+# DevOS layer: AI panel and Welcome (DevOS shell), keybinding patch, window rules,
+# greetd login, launcher entries (SRS §8, D-15).
+#
+# Only official packages and [devos] packages are used (D-14). end-4 dependencies that
+# are AUR-only are replaced (adw-gtk-theme, breeze, noto-fonts-emoji, adwaita-cursors)
+# or packaged in [devos] (devos-quickshell, devos-fonts).
+
+_end4_commit=2f0c8bf42b803f4d597572f2a014d4e78d7d9f26
+pkgname=devos-desktop
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='DevOS desktop: Hyprland + end-4 with the DevOS shell'
+arch=('any')
+url='https://github.com/DevOS'
+license=('GPL-3.0-or-later' 'GPL-3.0-only')
+depends=(
+    # compositor and session
+    hyprland hyprsunset hypridle hyprlock hyprpicker xdg-desktop-portal xdg-desktop-portal-hyprland
+    xdg-desktop-portal-gtk xdg-desktop-portal-kde greetd greetd-tuigreet gnome-keyring polkit-kde-agent
+    # shell (end-4 + DevOS shell)
+    devos-quickshell devos-ai qt6-5compat qt6-imageformats qt6-multimedia qt6-positioning
+    qt6-sensors qt6-svg qt6-virtualkeyboard qt6-wayland kirigami kdialog syntax-highlighting
+    # end-4 tools
+    kitty fish starship eza fuzzel matugen cliphist wl-clipboard jq ripgrep bc curl wget rsync
+    go-yq xdg-user-dirs brightnessctl ddcutil geoclue upower wtype ydotool imagemagick
+    translate-shell libqalculate songrec hyprshot slurp swappy wf-recorder tesseract tesseract-data-eng
+    cava pavucontrol-qt wireplumber pipewire-pulse libdbusmenu-gtk3 playerctl
+    networkmanager plasma-nm bluedevil dolphin systemsettings
+    # themes and fonts (official replacements for end-4's AUR picks)
+    adw-gtk-theme breeze adwaita-cursors noto-fonts noto-fonts-emoji ttf-jetbrains-mono
+    ttf-jetbrains-mono-nerd inter-font fontconfig devos-fonts
+)
+source=("dots-hyprland::git+https://github.com/end-4/dots-hyprland.git#commit=$_end4_commit")
+# Pinned by commit hash (BLD-006).
+sha256sums=('SKIP')
+
+_devos="$startdir/../../desktop"
+
+prepare() {
+    # DESK-021: apply the DevOS patch and fail loudly if upstream changed under it.
+    local kb=dots-hyprland/dots/.config/hypr/hyprland/keybinds.lua
+    sed -i -f "$_devos/patches/end4-keybinds.sed" "$kb"
+    grep -q 'devos:aiToggle' "$kb" || { error "end-4 keybind patch did not apply"; return 1; }
+    for f in execs rules; do
+        cat "$_devos/overrides/hypr/custom/$f.lua" >>"dots-hyprland/dots/.config/hypr/custom/$f.lua"
+    done
+}
+
+package() {
+    # New users start with the DevOS desktop. Existing ~/.config files are never
+    # touched by package upgrades (DESK-022).
+    install -d "$pkgdir/etc/skel/.config"
+    cp -r --no-preserve=ownership dots-hyprland/dots/.config/. "$pkgdir/etc/skel/.config/"
+    install -Dm644 dots-hyprland/LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE.end-4"
+
+    install -d "$pkgdir/usr/share/devos/shell"
+    cp -r --no-preserve=ownership "$_devos/devos-shell/." "$pkgdir/usr/share/devos/shell/"
+    install -Dm644 -t "$pkgdir/usr/share/applications" "$_devos"/applications/*.desktop
+    # greetd owns /etc/greetd and /etc/pam.d/greetd; devos-install installs these copies.
+    install -Dm644 "$_devos/greetd/config.toml" "$pkgdir/usr/share/devos/greetd/config.toml"
+    install -Dm644 "$_devos/greetd/pam-greetd" "$pkgdir/usr/share/devos/greetd/pam-greetd"
+}

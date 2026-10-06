@@ -1,0 +1,7 @@
+# DevOS login (SRS DESK-010, D-03): greetd + tuigreet, launching Hyprland.
+[terminal]
+vt = 1
+
+[default_session]
+command = "tuigreet --time --remember --asterisks --greeting 'DevOS' --cmd Hyprland"
+user = "greeter"
