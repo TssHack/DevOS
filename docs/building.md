@@ -30,8 +30,9 @@ qemu-system-x86_64 -enable-kvm -machine q35 -m 8G -smp 4 \
   -drive if=pflash,format=raw,readonly=on,file=/usr/share/edk2/x64/OVMF_CODE.4m.fd \
   -drive if=pflash,format=raw,file=ovmf_vars.fd \
   -device virtio-vga-gl -display gtk,gl=on \
+  -device virtio-tablet-pci -device virtio-keyboard-pci \
   -drive file=disk.qcow2,if=virtio -cdrom dist/devos-0.1.0-x86_64.iso
 ```
 
 (`cp /usr/share/edk2/x64/OVMF_VARS.4m.fd ovmf_vars.fd` and `qemu-img create -f qcow2 disk.qcow2 64G` first.)
-Hyprland needs GPU acceleration: use `virtio-vga-gl` with `gl=on` (SRS §5.3).
+Hyprland needs GPU acceleration: use `virtio-vga-gl` with `gl=on` (SRS §5.3). `virtio-tablet-pci` gives an absolute pointer; without it clicks land in the wrong place under Wayland.

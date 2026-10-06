@@ -111,7 +111,7 @@ These decisions close questions left open in SRS 0.1. The owner approved them on
 |---|---|---|---|---|
 | D-01 | Boot | **UEFI only**, **GRUB 2** for both the live ISO and the installed system, with a custom DevOS graphical theme (§6.1). BIOS boot is not supported. | One bootloader and one look from first boot to installed system; GRUB is the only mainstream UEFI bootloader with a full theming engine, and handles dual boot (os-prober). | Approved |
 | D-02 | Installer | **`devos-install`** built directly on the stable Arch tools (sgdisk, cryptsetup, pacstrap, genfstab, arch-chroot, grub-install) with a whiptail TUI and an unattended `--config` mode. archinstall stays on the ISO for custom layouts; `devos-install --post /mnt` then adds the DevOS layer. | Revised 2026-10-06: archinstall's configuration schema changes between releases (R-07) and could not be pinned; the direct approach is fully controlled and testable. | Approved (revised) |
-| D-03 | Display manager | **greetd + tuigreet**, with `pam_gnome_keyring` to unlock the keyring at login. | Lightweight, Wayland-native, official package. | Approved |
+| D-03 | Display manager | **greetd** with the **DevOS graphical login** (Quickshell in the `cage` kiosk compositor, same design as GRUB and the AI panel), falling back to **tuigreet** if it cannot start; `pam_gnome_keyring` unlocks the keyring at login. | Lightweight, Wayland-native, official packages; one design language from GRUB to desktop. | Approved (revised 2026-10-07) |
 | D-04 | Shell UI toolkit | **Quickshell (QML)**, matching end-4. The **DevOS shell** (`desktop/devos-shell`) is one Quickshell process holding the AI panel, the AI status indicator and the Welcome window. | end-4 is built on Quickshell; one UI stack, one process. | Approved |
 | D-05 | Terminal / launcher / notifications / bar | **kitty**; end-4's built-in launcher, notifications and bar. Waybar, mako, dunst are **not** used. | Avoid duplicating what end-4 already provides. | Approved |
 | D-06 | Daemon language | **Python 3** (system `python`), using the official Google Gen AI SDK. | Fastest path for MVP; matches Hermes Agent's ecosystem. Interfaces are language-neutral, so it can be rewritten later. | Approved |
@@ -257,7 +257,7 @@ The boot menu is the first DevOS screen a user sees; it shall look and behave li
 | DESK-007 | Desktop notifications shall work for applications and for DevOS approval requests. |
 | DESK-008 | The bar shall show workspaces, clock, network, audio and battery (end-4). A DevOS AI status indicator (§20.3) shall be visible whenever the AI is sending, running a tool or waiting for approval (highlighted), and open the panel on click; it is drawn by the DevOS shell below the bar, so end-4's bar is not patched. |
 | DESK-009 | Core actions shall have default keybindings, documented in `docs/keybindings.md`: terminal, launcher, DevOS AI panel, close window, workspace switching, screenshot, lock. |
-| DESK-010 | Login shall use greetd + tuigreet and shall unlock the Secret Service keyring through PAM (D-03). |
+| DESK-010 | Login shall use greetd with the DevOS graphical greeter (tuigreet as fallback), remember the last user, report wrong passwords clearly, offer restart/power off, and unlock the Secret Service keyring through PAM (D-03). The session starts through `devos-session`, which disables atomic KMS only inside virtual machines. |
 | DESK-011 | Screen lock shall be available and shall use the end-4 lock screen or `hyprlock`. |
 
 ## 8.2 Configuration Layer
