@@ -11,7 +11,7 @@ _PATTERNS = [
     re.compile(r"\b(?:ghp|gho|ghu|ghs|ghr)_[0-9A-Za-z]{36,}\b"),  # GitHub tokens
     re.compile(r"\bgithub_pat_[0-9A-Za-z_]{40,}\b"),
     re.compile(r"\bglpat-[0-9A-Za-z_\-]{20,}\b"),                # GitLab
-    re.compile(r"\bsk-(?:ant-|proj-)?[0-9A-Za-z_\-]{20,}\b"),     # Anthropic / OpenAI style
+    re.compile(r"\bsk-(?:ant-|proj-)?[0-9A-Za-z_\-]{20,}\b"),     # "sk-" style provider keys
     re.compile(r"\bxox[abprs]-[0-9A-Za-z\-]{10,}\b"),             # Slack
     re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b"),                 # AWS access key id
     re.compile(r"\bnpm_[0-9A-Za-z]{36}\b"),
