@@ -1,0 +1,58 @@
+#!/usr/bin/python3 -I
+"""devos-pkg-helper: the only privileged path for the DevOS agent (SRS §16.5).
+
+Invoked as root through pkexec (polkit action org.devos.package.manage,
+auth_admin every time). It trusts nothing from the caller and validates every
+argument again:  devos-pkg-helper install|remove PKG...
+"""
+
+import os
+import re
+import subprocess
+import sys
+
+NAME = re.compile(r"^[a-z0-9@._+-]+$")
+MAX_PACKAGES = 50
+# PRIV-003: never removable through the agent.
+PROTECTED = {
+    "base", "base-devel", "linux", "linux-lts", "linux-zen", "linux-hardened", "linux-firmware",
+    "systemd", "systemd-libs", "systemd-sysvcompat", "pacman", "glibc", "filesystem", "bash", "coreutils",
+    "sudo", "polkit", "grub", "efibootmgr", "mkinitcpio", "greetd", "greetd-tuigreet", "networkmanager",
+    "bubblewrap", "python", "util-linux", "shadow", "pam", "dbus", "intel-ucode", "amd-ucode",
+}
+
+
+def fail(msg: str, code: int = 2) -> None:
+    print(f"devos-pkg-helper: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def main(argv: list[str]) -> None:
+    if os.geteuid() != 0:
+        fail("must be run through pkexec")
+    if "PKEXEC_UID" not in os.environ:
+        fail("must be run through pkexec")
+    if len(argv) < 2 or argv[0] not in ("install", "remove"):
+        fail("usage: devos-pkg-helper install|remove PACKAGE...")
+    action, names = argv[0], argv[1:]
+    if len(names) > MAX_PACKAGES:
+        fail(f"at most {MAX_PACKAGES} packages")
+    for n in names:
+        # No options, paths, URLs or local files: names only (PRIV-002).
+        if not NAME.fullmatch(n) or n.startswith("-") or n.endswith((".pkg.tar.zst", ".pkg.tar.xz")):
+            fail(f"invalid package name: {n!r}")
+    if action == "remove":
+        protected = sorted(n for n in names if n in PROTECTED or n.startswith("devos"))
+        if protected:
+            fail(f"refusing to remove protected packages: {' '.join(protected)}")
+        cmd = ["pacman", "-R", "--noconfirm", "--noprogressbar", "--", *names]
+    else:
+        # -S only: no database refresh and no partial upgrade (-Sy) or full upgrade (-Syu).
+        cmd = ["pacman", "-S", "--needed", "--noconfirm", "--noprogressbar", "--", *names]
+    print(f"devos-pkg-helper: uid {os.environ['PKEXEC_UID']} {action} {' '.join(names)}", file=sys.stderr)
+    env = {"PATH": "/usr/bin", "LANG": "C.UTF-8"}
+    sys.exit(subprocess.run(cmd, env=env, stdin=subprocess.DEVNULL).returncode)
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

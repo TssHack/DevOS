@@ -1,0 +1,53 @@
+# Maintainer: Ehsan Fazli
+# DevOS AI layer: devosd, devos CLI, agent runtime, policy, privileged package helper.
+# Built from this repository by scripts/build-repo.sh (SRS BLD-003).
+
+pkgname=devos-ai
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='DevOS AI daemon, CLI and sandboxed agent runtime'
+arch=('any')
+url='https://github.com/DevOS'
+license=('GPL-3.0-or-later')
+depends=('python>=3.11' 'bubblewrap' 'libsecret' 'polkit' 'systemd' 'git' 'ripgrep')
+optdepends=('libnotify: desktop notification for approval requests'
+            'gnome-keyring: Secret Service provider for the API key')
+backup=()
+source=()
+
+_ai="$startdir/../../ai"
+_pydir=/usr/lib/devos/python
+
+check() {
+    cd "$_ai"
+    PYTHONPATH=.:tests python -m unittest discover -s tests
+}
+
+package() {
+    # Private module tree: not importable by other programs, stdlib only.
+    install -d "$pkgdir$_pydir"
+    cp -r "$_ai/devos" "$pkgdir$_pydir/"
+    find "$pkgdir$_pydir" -name __pycache__ -prune -exec rm -rf {} +
+    python -m compileall -q -d "$_pydir" "$pkgdir$_pydir"
+
+    for tool in devos:devos.cli devosd:devos.daemon; do
+        install -Dm755 /dev/stdin "$pkgdir/usr/bin/${tool%%:*}" <<WRAPPER
+#!/usr/bin/python3 -I
+import sys
+sys.path.insert(0, "$_pydir")
+from ${tool#*:} import main
+main()
+WRAPPER
+    done
+
+    install -Dm644 "$_ai/policy/policy.toml"   "$pkgdir/usr/share/devos/ai/policy.toml"
+    install -Dm644 "$_ai/policy/defaults.toml" "$pkgdir/usr/share/devos/ai/defaults.toml"
+    install -Dm755 "$_ai/system/bin/devos-pkg-helper" "$pkgdir/usr/lib/devos/devos-pkg-helper"
+    install -Dm644 "$_ai/system/polkit/org.devos.package.manage.policy" \
+        "$pkgdir/usr/share/polkit-1/actions/org.devos.package.manage.policy"
+    install -Dm644 "$_ai/system/systemd/devosd.socket"  "$pkgdir/usr/lib/systemd/user/devosd.socket"
+    install -Dm644 "$_ai/system/systemd/devosd.service" "$pkgdir/usr/lib/systemd/user/devosd.service"
+    # Enabled for every user (socket-activated: no cost until first use).
+    install -d "$pkgdir/usr/lib/systemd/user/sockets.target.wants"
+    ln -s ../devosd.socket "$pkgdir/usr/lib/systemd/user/sockets.target.wants/devosd.socket"
+}

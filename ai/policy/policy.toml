@@ -1,0 +1,126 @@
+# DevOS AI default policy (SRS §16). Installed to /usr/share/devos/ai/policy.toml.
+# /etc/devos/policy.toml may override; ~/.config/devos/policy.toml may only make
+# it stricter (PERM-006). No agent tool can write any policy file.
+
+[limits]                       # AGENT-006, AGENT-008, SBX-005, PERM-005
+max_tool_calls = 30
+max_task_minutes = 15
+result_bytes = 65536
+command_timeout_default = 300
+command_timeout_max = 1800
+command_output_bytes = 4194304
+approval_timeout = 600
+memory_max_percent = 50
+tasks_max = 512
+
+[paths]
+# BLOCKED for read and write, masked inside every sandbox (§16.3).
+denied = [
+  "~/.ssh", "~/.gnupg", "~/.local/share/keyrings", "~/.password-store",
+  "~/.config/devos", "~/.local/state/devos", "~/.local/share/devos",
+  "~/.mozilla", "~/.config/chromium", "~/.config/google-chrome", "~/.config/BraveSoftware",
+  "~/.aws", "~/.kube", "~/.docker/config.json", "~/.config/gh/hosts.yml",
+  "~/.netrc", "~/.git-credentials", "~/.config/git/credentials", "~/.pypirc", "~/.npmrc",
+  "~/.cargo/credentials.toml", "~/.config/rclone",
+  "/etc/shadow", "/etc/gshadow", "/etc/sudoers", "/etc/sudoers.d", "/root", "/boot",
+]
+# Reading these inside the workspace needs confirmation (PERM-020).
+sensitive_names = [".env", ".env.*", "*.pem", "*.key", "id_*", "*.p12", "*.pfx",
+                   "credentials*", "secrets*", "*.kdbx"]
+# Never writable by the agent, even inside a workspace (SEC-010).
+protected = [
+  "~/.bashrc", "~/.bash_profile", "~/.profile", "~/.zshrc", "~/.zprofile", "~/.zshenv",
+  "~/.config/fish", "~/.config/systemd", "~/.config/autostart", "~/.config/hypr",
+  "~/.config/environment.d", "~/.pam_environment", "/etc/devos",
+]
+# Writable inside command sandboxes so toolchains work (SBX-001).
+sandbox_cache_dirs = ["~/.cache", "~/.cargo/registry", "~/.cargo/git", "~/.rustup",
+                      "~/go/pkg", "~/.local/share/uv"]
+sandbox_env = ["PATH", "HOME", "USER", "LOGNAME", "LANG", "TERM", "TZ"]
+
+[commands]
+shells = ["sh", "bash", "zsh", "fish", "dash", "ksh", "tcsh", "csh", "busybox"]
+# Run another program; classified by what they run, never SAFE themselves.
+wrappers = ["env", "nice", "ionice", "timeout", "nohup", "stdbuf", "time", "command",
+            "exec", "xargs", "unbuffer", "chronic", "flock", "setsid", "taskset", "strace", "ltrace"]
+# PERM-013
+blocked = ["sudo", "su", "doas", "pkexec", "run0", "sudoedit", "mount", "umount", "dd", "wipefs",
+           "fdisk", "sfdisk", "cfdisk", "gdisk", "sgdisk", "parted", "cryptsetup", "losetup",
+           "shutdown", "reboot", "poweroff", "halt", "kexec", "pacman", "yay", "paru",
+           "chown", "chgrp", "insmod", "rmmod", "modprobe", "swapon", "swapoff", "visudo",
+           "passwd", "chpasswd", "usermod", "useradd", "userdel", "groupadd", "setcap",
+           "mkswap", "blkdiscard", "hdparm", "nvme", "efibootmgr", "grub-install", "bootctl"]
+blocked_prefixes = ["mkfs", "fsck"]
+
+# SAFE allowlist (PERM-011). Program must be found in PATH, not given as a path.
+# forbid: argument prefixes that make the command not SAFE.
+# flags_only: SAFE only when every argument is one of these flags.
+[[commands.safe]]
+program = "ls"
+[[commands.safe]]
+program = "pwd"
+[[commands.safe]]
+program = "cat"
+[[commands.safe]]
+program = "head"
+[[commands.safe]]
+program = "tail"
+forbid = ["-f", "-F", "--follow"]
+[[commands.safe]]
+program = "wc"
+[[commands.safe]]
+program = "file"
+forbid = ["-C", "--compile", "-m", "--magic-file"]
+[[commands.safe]]
+program = "stat"
+[[commands.safe]]
+program = "grep"
+[[commands.safe]]
+program = "rg"
+forbid = ["--pre", "--pre-glob", "-z", "--search-zip"]
+[[commands.safe]]
+program = "fd"
+forbid = ["-x", "--exec", "-X", "--exec-batch"]
+[[commands.safe]]
+program = "find"
+forbid = ["-exec", "-execdir", "-ok", "-okdir", "-delete", "-fprint", "-fprint0", "-fprintf", "-fls"]
+[[commands.safe]]
+program = "tree"
+forbid = ["-o"]
+[[commands.safe]]
+program = "du"
+[[commands.safe]]
+program = "uname"
+[[commands.safe]]
+program = "df"
+[[commands.safe]]
+program = "free"
+[[commands.safe]]
+program = "ps"
+[[commands.safe]]
+program = "whoami"
+[[commands.safe]]
+program = "date"
+flags_only = ["-u", "-R", "-I", "--iso-8601", "--rfc-3339=seconds", "--utc"]
+[[commands.safe]]
+program = "git"
+subcommand = "status"
+[[commands.safe]]
+program = "git"
+subcommand = "diff"
+forbid = ["--output", "--ext-diff", "--textconv"]
+[[commands.safe]]
+program = "git"
+subcommand = "log"
+forbid = ["--output", "--ext-diff", "--textconv"]
+[[commands.safe]]
+program = "git"
+subcommand = "show"
+forbid = ["--output", "--ext-diff", "--textconv"]
+[[commands.safe]]
+program = "git"
+subcommand = "rev-parse"
+[[commands.safe]]
+program = "git"
+subcommand = "branch"
+flags_only = ["-a", "-r", "-v", "-vv", "--list", "--all", "--remotes", "--show-current", "--no-color"]

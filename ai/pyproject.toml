@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "devos-ai"
+version = "0.1.0"
+description = "DevOS AI: devosd, tools, providers and agent runtime"
+requires-python = ">=3.11"
+license = "GPL-3.0-or-later"
+dependencies = []
+
+[project.scripts]
+devos = "devos.cli:main"
+devosd = "devos.daemon:main"
+
+[tool.setuptools]
+packages = ["devos", "devos.providers", "devos.runtime"]

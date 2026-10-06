@@ -1,0 +1,17 @@
+# DevOS AI defaults. Installed to /usr/share/devos/ai/defaults.toml.
+# User overrides: ~/.config/devos/ai.toml (see `devos ai settings`).
+
+[ai]
+provider = "gemini"
+# Alias for Google's current stable Flash model (AI-010).
+model = "gemini-flash-latest"
+# "native" (built in) or "hermes" (only if the §14.4 spike passes).
+runtime = "native"
+
+[gemini]
+base_url = "https://generativelanguage.googleapis.com/v1beta"
+
+[daemon]
+# Exit when idle; systemd socket activation restarts devosd on demand (NFR-003).
+idle_exit_minutes = 10
+audit_retention_days = 30

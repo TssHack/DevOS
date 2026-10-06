@@ -1,0 +1,20 @@
+[Unit]
+Description=DevOS AI daemon
+Documentation=https://github.com/DevOS
+Requires=devosd.socket
+After=devosd.socket
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/devosd
+Restart=on-failure
+RestartSec=2
+UMask=0077
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+# Agent processes run in their own scopes; stopping devosd kills them (bwrap --die-with-parent).
+KillMode=mixed
+
+[Install]
+Also=devosd.socket

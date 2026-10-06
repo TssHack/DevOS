@@ -1,0 +1,12 @@
+[Unit]
+Description=DevOS AI daemon socket
+Documentation=https://github.com/DevOS
+
+[Socket]
+ListenStream=%t/devos/ui.sock
+SocketMode=0600
+DirectoryMode=0700
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target
