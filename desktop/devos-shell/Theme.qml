@@ -17,7 +17,8 @@ Singleton {
     readonly property color warning: "#fbbf24"
     readonly property color success: "#4ade80"
     readonly property string mono: "JetBrains Mono"
-    readonly property string display: "Space Grotesk"
+    // Inter: official package (inter-font), so login, panel and Welcome render identically everywhere.
+    readonly property string display: "Inter"
     readonly property int radius: 14
     readonly property int gap: 12
 }

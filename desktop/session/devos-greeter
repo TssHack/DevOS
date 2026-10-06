@@ -1,0 +1,13 @@
+#!/bin/sh
+# greetd greeter for DevOS (SRS DESK-010): the graphical login (Quickshell in the
+# cage kiosk compositor). Falls back to the text greeter if it cannot start.
+if command -v cage >/dev/null && command -v qs >/dev/null && [ -f /usr/share/devos/greeter/shell.qml ]; then
+    # cage draws no window decorations; keep Qt from drawing its own title bar.
+    export QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+    # Hardware cursor planes are unreliable on virtual GPUs.
+    if systemd-detect-virt --vm --quiet; then
+        export WLR_NO_HARDWARE_CURSORS=1
+    fi
+    cage -s -m last -- qs -p /usr/share/devos/greeter && exit 0
+fi
+exec tuigreet --time --remember --asterisks --greeting 'DevOS' --cmd devos-session

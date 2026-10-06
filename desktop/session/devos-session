@@ -1,0 +1,9 @@
+#!/bin/sh
+# DevOS graphical session, started by greetd (SRS DESK-010).
+# In virtual machines, Hyprland's atomic KMS commits can stall on virtual GPUs
+# ("Cannot commit when a page-flip is awaiting") and freeze the screen after the
+# first frame; legacy modesetting avoids it. Real hardware keeps atomic KMS.
+if systemd-detect-virt --vm --quiet; then
+    export AQ_NO_ATOMIC=1
+fi
+exec Hyprland

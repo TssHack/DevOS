@@ -1,7 +1,8 @@
-# DevOS login (SRS DESK-010, D-03): greetd + tuigreet, launching Hyprland.
+# DevOS login (SRS DESK-010, D-03): greetd with the DevOS graphical greeter
+# (falls back to tuigreet), launching the DevOS session (Hyprland).
 [terminal]
 vt = 1
 
 [default_session]
-command = "tuigreet --time --remember --asterisks --greeting 'DevOS' --cmd Hyprland"
+command = "/usr/lib/devos/devos-greeter"
 user = "greeter"

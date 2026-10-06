@@ -8,9 +8,10 @@
 # or packaged in [devos] (devos-quickshell, devos-fonts).
 
 _end4_commit=2f0c8bf42b803f4d597572f2a014d4e78d7d9f26
+_shapes_commit=e31ec4cb4ebf6a46b267f5c42eabf6874916fa16   # end-4's git submodule at that commit
 pkgname=devos-desktop
 pkgver=0.1.0
-pkgrel=1
+pkgrel=4
 pkgdesc='DevOS desktop: Hyprland + end-4 with the DevOS shell'
 arch=('any')
 url='https://github.com/DevOS'
@@ -18,7 +19,7 @@ license=('GPL-3.0-or-later' 'GPL-3.0-only')
 depends=(
     # compositor and session
     hyprland hyprsunset hypridle hyprlock hyprpicker xdg-desktop-portal xdg-desktop-portal-hyprland
-    xdg-desktop-portal-gtk xdg-desktop-portal-kde greetd greetd-tuigreet gnome-keyring polkit-kde-agent
+    xdg-desktop-portal-gtk xdg-desktop-portal-kde greetd greetd-tuigreet cage gnome-keyring polkit-kde-agent
     # shell (end-4 + DevOS shell)
     devos-quickshell devos-ai qt6-5compat qt6-imageformats qt6-multimedia qt6-positioning
     qt6-sensors qt6-svg qt6-virtualkeyboard qt6-wayland kirigami kdialog syntax-highlighting
@@ -32,13 +33,21 @@ depends=(
     adw-gtk-theme breeze adwaita-cursors noto-fonts noto-fonts-emoji ttf-jetbrains-mono
     ttf-jetbrains-mono-nerd inter-font fontconfig devos-fonts
 )
-source=("dots-hyprland::git+https://github.com/end-4/dots-hyprland.git#commit=$_end4_commit")
+source=("dots-hyprland::git+https://github.com/end-4/dots-hyprland.git#commit=$_end4_commit"
+        "rounded-polygon-qmljs::git+https://github.com/end-4/rounded-polygon-qmljs.git#commit=$_shapes_commit")
 # Pinned by commit hash (BLD-006).
-sha256sums=('SKIP')
+sha256sums=('SKIP' 'SKIP')
 
 _devos="$startdir/../../desktop"
 
 prepare() {
+    # end-4's Quickshell config needs its "shapes" submodule (makepkg does not fetch submodules).
+    local shapes=dots/.config/quickshell/ii/modules/common/widgets/shapes
+    git -C dots-hyprland submodule init "$shapes"
+    git -C dots-hyprland config "submodule.$shapes.url" "$srcdir/rounded-polygon-qmljs"
+    git -C dots-hyprland -c protocol.file.allow=always submodule update "$shapes"
+    [[ -n "$(ls -A "dots-hyprland/$shapes")" ]] || { error "end-4 shapes submodule is empty"; return 1; }
+
     # DESK-021: apply the DevOS patch and fail loudly if upstream changed under it.
     local kb=dots-hyprland/dots/.config/hypr/hyprland/keybinds.lua
     sed -i -f "$_devos/patches/end4-keybinds.sed" "$kb"
@@ -53,11 +62,20 @@ package() {
     # touched by package upgrades (DESK-022).
     install -d "$pkgdir/etc/skel/.config"
     cp -r --no-preserve=ownership dots-hyprland/dots/.config/. "$pkgdir/etc/skel/.config/"
+    find "$pkgdir/etc/skel" -name .git -prune -exec rm -rf {} +
+    install -Dm644 "$_devos/skel/zshrc" "$pkgdir/etc/skel/.zshrc"
     install -Dm644 dots-hyprland/LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE.end-4"
 
     install -d "$pkgdir/usr/share/devos/shell"
     cp -r --no-preserve=ownership "$_devos/devos-shell/." "$pkgdir/usr/share/devos/shell/"
     install -Dm644 -t "$pkgdir/usr/share/applications" "$_devos"/applications/*.desktop
+    install -Dm755 "$_devos/session/devos-session" "$pkgdir/usr/bin/devos-session"
+    # Graphical login: greeter files plus the shared DevOS theme and button.
+    install -d "$pkgdir/usr/share/devos/greeter"
+    install -m644 -t "$pkgdir/usr/share/devos/greeter" "$_devos"/devos-greeter/* \
+        "$_devos/devos-shell/Theme.qml" "$_devos/devos-shell/DButton.qml"
+    install -Dm755 "$_devos/session/devos-greeter" "$pkgdir/usr/lib/devos/devos-greeter"
+    install -Dm644 "$_devos/greetd/devos-greeter.tmpfiles" "$pkgdir/usr/lib/tmpfiles.d/devos-greeter.conf"
     # greetd owns /etc/greetd and /etc/pam.d/greetd; devos-install installs these copies.
     install -Dm644 "$_devos/greetd/config.toml" "$pkgdir/usr/share/devos/greetd/config.toml"
     install -Dm644 "$_devos/greetd/pam-greetd" "$pkgdir/usr/share/devos/greetd/pam-greetd"
