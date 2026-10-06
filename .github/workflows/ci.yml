@@ -1,0 +1,51 @@
+# DevOS CI (SRS BLD-007)
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      # bubblewrap needs user namespaces for the sandbox tests
+      options: --privileged
+    steps:
+      - name: Install tools
+        run: pacman -Syu --noconfirm --needed git python bubblewrap ripgrep libsecret shellcheck libarchive
+      - uses: actions/checkout@v4
+      - name: shellcheck
+        run: shellcheck scripts/*.sh installer/devos-install iso/profiledef.sh
+      - name: Package lists (OS-012, PROF-004)
+        run: scripts/check-packages.sh developer/profiles/*.list
+      - name: DevOS AI tests (policy corpus, sandbox, tools, daemon end-to-end)
+        working-directory: ai
+        run: PYTHONPATH=.:tests python -m unittest discover -s tests -v
+
+  repo-and-iso:
+    if: github.event_name == 'push'
+    needs: checks
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+      options: --privileged
+    steps:
+      - name: Install build tools
+        run: pacman -Syu --noconfirm --needed base-devel git archiso grub mtools python bubblewrap ripgrep libsecret
+      - uses: actions/checkout@v4
+      - name: Build [devos] repository (as a normal user; makepkg refuses root)
+        run: |
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: /usr/bin/pacman' >/etc/sudoers.d/builder
+          chown -R builder: "$GITHUB_WORKSPACE"
+          su builder -c "cd '$GITHUB_WORKSPACE' && scripts/build-repo.sh -s"
+      - name: Build ISO
+        run: scripts/build-iso.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: devos-iso
+          path: dist/
+          retention-days: 7
