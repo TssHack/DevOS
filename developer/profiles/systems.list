@@ -1,0 +1,14 @@
+# DevOS developer profile: systems
+gcc
+clang
+llvm
+nasm
+qemu-full
+edk2-ovmf
+bpftrace
+bpf
+linux-headers
+meson
+ccache
+mold
+aarch64-linux-gnu-gcc

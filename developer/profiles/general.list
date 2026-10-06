@@ -1,0 +1,62 @@
+# DevOS developer profile: general (preinstalled, SRS §9.1 DEV-001..013)
+# Version control
+git
+git-lfs
+github-cli
+openssh
+# C / C++
+base-devel
+clang
+lld
+cmake
+ninja
+gdb
+lldb
+# Python
+python
+python-pip
+python-pipx
+uv
+# JavaScript / TypeScript
+nodejs
+npm
+typescript
+# Go
+go
+gopls
+# Rust (toolchain installed with: rustup default stable)
+rustup
+# Editors
+neovim
+code
+# CLI tools
+ripgrep
+fd
+fzf
+jq
+tmux
+tree
+curl
+wget
+bat
+eza
+btop
+htop
+zoxide
+unzip
+zip
+man-db
+man-pages
+# Containers (rootless Podman, D-08)
+podman
+podman-docker
+podman-compose
+buildah
+fuse-overlayfs
+slirp4netns
+# Debugging and inspection
+strace
+ltrace
+valgrind
+perf
+lsof

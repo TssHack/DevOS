@@ -1,0 +1,10 @@
+# DevOS developer profile: web
+pnpm
+yarn
+deno
+bun
+nginx
+sqlite
+postgresql-libs
+chromium
+firefox-developer-edition

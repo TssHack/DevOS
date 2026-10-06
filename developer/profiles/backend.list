@@ -1,0 +1,14 @@
+# DevOS developer profile: backend
+postgresql
+valkey
+sqlite
+mariadb-clients
+jdk-openjdk
+maven
+gradle
+dotnet-sdk
+php
+composer
+protobuf
+grpc
+httpie

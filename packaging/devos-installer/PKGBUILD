@@ -1,0 +1,18 @@
+# Maintainer: Ehsan Fazli
+# DevOS installer (SRS §7.1). Shipped on the live ISO.
+
+pkgname=devos-installer
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='DevOS installer (UEFI, GRUB, optional LUKS2)'
+arch=('any')
+url='https://github.com/DevOS'
+license=('GPL-3.0-or-later')
+depends=('bash' 'arch-install-scripts' 'gptfdisk' 'parted' 'cryptsetup' 'dosfstools' 'e2fsprogs'
+         'util-linux' 'libnewt' 'curl')
+source=()
+
+package() {
+    install -Dm755 "$startdir/../../installer/devos-install" "$pkgdir/usr/bin/devos-install"
+    install -Dm644 "$startdir/../../installer/example.conf" "$pkgdir/usr/share/doc/devos-installer/example.conf"
+}

@@ -1,0 +1,7 @@
+# DevOS developer profile: ai (local tooling; DevOS AI itself needs no profile)
+python-numpy
+python-pandas
+python-scikit-learn
+python-pytorch
+python-matplotlib
+jupyterlab

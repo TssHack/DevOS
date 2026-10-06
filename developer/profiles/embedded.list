@@ -1,0 +1,11 @@
+# DevOS developer profile: embedded
+arm-none-eabi-gcc
+arm-none-eabi-newlib
+arm-none-eabi-gdb
+openocd
+picocom
+minicom
+dfu-util
+avrdude
+avr-gcc
+avr-libc

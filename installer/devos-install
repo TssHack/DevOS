@@ -1,0 +1,296 @@
+#!/usr/bin/env bash
+# devos-install: install DevOS from the live ISO (SRS §7.1, INST-001..007).
+#
+#   devos-install                      interactive (whiptail TUI)
+#   devos-install --config FILE        unattended (INST-007); see installer/example.conf
+#   devos-install --post /mnt          apply the DevOS layer to a system installed by other
+#                                      means (e.g. archinstall with custom partitioning)
+#
+# Layout (UEFI only, INST-003): GPT, 1 GiB EFI system partition mounted at /boot
+# (kernels live there, so GRUB never needs to unlock an encrypted root), and one
+# root partition: ext4, optionally inside LUKS2 (D-17).
+
+set -euo pipefail
+
+TARGET=/mnt
+LOG=/tmp/devos-install.log
+DEVOS_GRUB_DEFAULTS=/usr/share/devos/grub/default-grub
+BASE_PACKAGES=(base linux linux-firmware sof-firmware intel-ucode amd-ucode mkinitcpio sudo
+               networkmanager openssh grub efibootmgr os-prober dosfstools e2fsprogs cryptsetup
+               man-db man-pages less neovim zsh)
+DEVOS_PACKAGES=(devos-desktop devos-ai devos-grub-theme devos-profile-general)
+
+# Settings (interactive answers or --config). Passwords are never logged.
+DISK="" HOSTNAME_="devos" USERNAME="" PASSWORD="" PASSWORD_HASH="" TIMEZONE="UTC"
+LOCALE="en_US.UTF-8" KEYMAP="us" ENCRYPT="no" LUKS_PASSWORD="" PROFILES="" ASSUME_YES="no"
+
+log()  { printf '%s %s\n' "$(date +%T)" "$*" >>"$LOG"; printf '\033[1;36m==>\033[0m %s\n' "$*"; }
+die()  { printf '%s ERROR %s\n' "$(date +%T)" "$*" >>"$LOG"; printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
+run()  { "$@" >>"$LOG" 2>&1 || die "failed: $1 (see $LOG)"; }
+chroot_run() { run arch-chroot "$TARGET" "$@"; }
+
+# ------------------------------------------------------------------ checks
+preflight() {
+    (( EUID == 0 )) || die "run as root"
+    [[ -d /sys/firmware/efi/efivars ]] || die "DevOS installs only on UEFI systems. This machine was booted in BIOS/legacy mode; enable UEFI boot in the firmware settings and boot the ISO again."
+    for c in sgdisk cryptsetup pacstrap genfstab arch-chroot mkfs.fat mkfs.ext4 lsblk; do
+        command -v "$c" >/dev/null || die "missing tool: $c"
+    done
+}
+
+check_network() {
+    curl -fsS --max-time 10 -o /dev/null https://archlinux.org || \
+        die "no network connection. Connect first (Wi-Fi: nmtui), then run devos-install again."
+}
+
+# ------------------------------------------------------------- config file
+# KEY=VALUE lines; parsed, never sourced, so a config file cannot run code.
+load_config() {
+    local file="$1" key value
+    [[ -r "$file" ]] || die "cannot read $file"
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        [[ "$line" =~ ^[[:space:]]*(#|$) ]] && continue
+        [[ "$line" =~ ^([A-Z_]+)=(.*)$ ]] || die "invalid line in $file: $line"
+        key="${BASH_REMATCH[1]}" value="${BASH_REMATCH[2]}"
+        value="${value#\"}" value="${value%\"}"
+        case "$key" in
+            DISK) DISK="$value" ;; HOSTNAME) HOSTNAME_="$value" ;; USERNAME) USERNAME="$value" ;;
+            PASSWORD) PASSWORD="$value" ;; PASSWORD_HASH) PASSWORD_HASH="$value" ;;
+            TIMEZONE) TIMEZONE="$value" ;; LOCALE) LOCALE="$value" ;; KEYMAP) KEYMAP="$value" ;;
+            ENCRYPT) ENCRYPT="$value" ;; LUKS_PASSWORD) LUKS_PASSWORD="$value" ;;
+            PROFILES) PROFILES="$value" ;; ASSUME_YES) ASSUME_YES="$value" ;;
+            *) die "unknown setting in $file: $key" ;;
+        esac
+    done <"$file"
+}
+
+validate() {
+    [[ -b "$DISK" ]] || die "not a block device: $DISK"
+    [[ "$(lsblk -dno TYPE "$DISK")" == disk ]] || die "$DISK is not a whole disk"
+    if lsblk -lno MOUNTPOINTS "$DISK" | grep -q .; then die "$DISK has mounted partitions (is it the live USB?)"; fi
+    [[ "$HOSTNAME_" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]] || die "invalid hostname: $HOSTNAME_"
+    [[ "$USERNAME" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || die "invalid user name: $USERNAME"
+    [[ "$USERNAME" != root ]] || die "choose a user name other than root"
+    [[ -n "$PASSWORD" || -n "$PASSWORD_HASH" ]] || die "a user password is required"
+    [[ -e "/usr/share/zoneinfo/$TIMEZONE" ]] || die "unknown time zone: $TIMEZONE"
+    grep -q "^#\?${LOCALE//./\\.} " /etc/locale.gen || die "unknown locale: $LOCALE"
+    [[ "$ENCRYPT" == yes || "$ENCRYPT" == no ]] || die "ENCRYPT must be yes or no"
+    [[ "$ENCRYPT" == no || -n "$LUKS_PASSWORD" ]] || die "LUKS_PASSWORD is required with ENCRYPT=yes"
+    for p in $PROFILES; do [[ "$p" =~ ^(web|backend|systems|ai|embedded)$ ]] || die "unknown profile: $p"; done
+}
+
+# -------------------------------------------------------------- interactive
+ask() { whiptail --title "DevOS installer" "$@" 3>&1 1>&2 2>&3; }
+
+interactive() {
+    command -v whiptail >/dev/null || die "whiptail is missing; use --config"
+    local disks=()
+    while read -r name size model; do disks+=("$name" "$size ${model:-disk}"); done \
+        < <(lsblk -dpno NAME,SIZE,MODEL -e 7,11 | awk '{n=$1; s=$2; $1=$2=""; print n, s, $0}')
+    (( ${#disks[@]} )) || die "no disks found"
+    DISK=$(ask --menu "Install DevOS on which disk? ALL DATA ON IT WILL BE ERASED." 18 72 8 "${disks[@]}") || exit 1
+    HOSTNAME_=$(ask --inputbox "Computer name" 8 60 "$HOSTNAME_") || exit 1
+    USERNAME=$(ask --inputbox "Your user name (lowercase)" 8 60) || exit 1
+    local p1 p2
+    while :; do
+        p1=$(ask --passwordbox "Password for $USERNAME" 8 60) || exit 1
+        p2=$(ask --passwordbox "Repeat the password" 8 60) || exit 1
+        [[ -n "$p1" && "$p1" == "$p2" ]] && break
+        ask --msgbox "The passwords are empty or do not match." 8 60
+    done
+    PASSWORD="$p1"
+    TIMEZONE=$(ask --inputbox "Time zone (e.g. Asia/Tehran, Europe/Berlin)" 8 60 \
+        "$(curl -fsS --max-time 5 https://ipapi.co/timezone 2>/dev/null || echo UTC)") || exit 1
+    KEYMAP=$(ask --inputbox "Console keyboard layout" 8 60 "$KEYMAP") || exit 1
+    if ask --yesno "Encrypt the disk (LUKS2)? You will type a passphrase at every boot." 8 70; then
+        ENCRYPT=yes
+        while :; do
+            p1=$(ask --passwordbox "Disk encryption passphrase" 8 60) || exit 1
+            p2=$(ask --passwordbox "Repeat the passphrase" 8 60) || exit 1
+            [[ -n "$p1" && "$p1" == "$p2" ]] && break
+            ask --msgbox "The passphrases are empty or do not match." 8 60
+        done
+        LUKS_PASSWORD="$p1"
+    fi
+    PROFILES=$(ask --separate-output --checklist "Extra developer profiles (the General profile is always installed)" 16 70 5 \
+        web "Web: pnpm, bun, deno, browsers" OFF backend "Backend: PostgreSQL, Valkey, JDK, .NET, PHP" OFF \
+        systems "Systems: LLVM, QEMU, bpftrace" OFF ai "AI: PyTorch, Jupyter" OFF \
+        embedded "Embedded: ARM/AVR toolchains, OpenOCD" OFF | tr '\n' ' ') || exit 1
+}
+
+confirm() {
+    [[ "$ASSUME_YES" == yes ]] && return
+    local answer
+    printf '\nThis will ERASE ALL DATA on %s (%s).\nType the disk name (%s) to continue: ' \
+        "$DISK" "$(lsblk -dno SIZE,MODEL "$DISK" | xargs)" "$(basename "$DISK")"
+    read -r answer
+    [[ "$answer" == "$(basename "$DISK")" ]] || die "aborted"
+}
+
+# ------------------------------------------------------------- installation
+partition() {
+    log "Partitioning $DISK"
+    umount -R "$TARGET" 2>/dev/null || true
+    run wipefs --all --force "$DISK"
+    run sgdisk --zap-all "$DISK"
+    run sgdisk -n1:0:+1G -t1:ef00 -c1:DEVOS_EFI -n2:0:0 -t2:8304 -c2:devos-root "$DISK"
+    run partprobe "$DISK"
+    run udevadm settle
+    mapfile -t PARTS < <(lsblk -lnpo NAME,TYPE "$DISK" | awk '$2 == "part" {print $1}')
+    (( ${#PARTS[@]} == 2 )) || die "unexpected partition layout on $DISK"
+    ESP="${PARTS[0]}" ROOTPART="${PARTS[1]}"
+
+    run mkfs.fat -F 32 -n DEVOS_EFI "$ESP"
+    ROOTDEV="$ROOTPART"
+    if [[ "$ENCRYPT" == yes ]]; then
+        log "Encrypting the root partition (LUKS2)"
+        printf '%s' "$LUKS_PASSWORD" | cryptsetup luksFormat --type luks2 --batch-mode --key-file=- "$ROOTPART" >>"$LOG" 2>&1 \
+            || die "cryptsetup luksFormat failed"
+        printf '%s' "$LUKS_PASSWORD" | cryptsetup open --key-file=- "$ROOTPART" root >>"$LOG" 2>&1 \
+            || die "cryptsetup open failed"
+        ROOTDEV=/dev/mapper/root
+    fi
+    run mkfs.ext4 -F -L devos "$ROOTDEV"
+    run mount "$ROOTDEV" "$TARGET"
+    run mount --mkdir -o umask=0077 "$ESP" "$TARGET/boot"
+}
+
+install_base() {
+    log "Installing packages (this takes a while)"
+    local profiles=() p
+    for p in $PROFILES; do profiles+=("devos-profile-$p"); done
+    run pacstrap -K "$TARGET" "${BASE_PACKAGES[@]}" "${DEVOS_PACKAGES[@]}" "${profiles[@]}"
+    install_pacman_conf
+    genfstab -U "$TARGET" >>"$TARGET/etc/fstab"
+}
+
+configure_system() {
+    log "Configuring the system"
+    chroot_run ln -sf "/usr/share/zoneinfo/$TIMEZONE" /etc/localtime
+    chroot_run hwclock --systohc
+    sed -i "s/^#\(${LOCALE//./\\.} \)/\1/" "$TARGET/etc/locale.gen"
+    chroot_run locale-gen
+    echo "LANG=$LOCALE" >"$TARGET/etc/locale.conf"
+    echo "KEYMAP=$KEYMAP" >"$TARGET/etc/vconsole.conf"
+    echo "$HOSTNAME_" >"$TARGET/etc/hostname"
+    # DevOS identity (the filesystem package ships an Arch os-release symlink).
+    rm -f "$TARGET/etc/os-release"
+    sed 's/ (Live)//' /etc/os-release >"$TARGET/etc/os-release"
+    printf '127.0.0.1 localhost\n::1 localhost\n127.0.1.1 %s.localdomain %s\n' "$HOSTNAME_" "$HOSTNAME_" >"$TARGET/etc/hosts"
+
+    if [[ "$ENCRYPT" == yes ]]; then
+        sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block sd-encrypt filesystems fsck)/' \
+            "$TARGET/etc/mkinitcpio.conf"
+    else
+        sed -i 's/^HOOKS=.*/HOOKS=(base systemd autodetect microcode modconf kms keyboard sd-vconsole block filesystems fsck)/' \
+            "$TARGET/etc/mkinitcpio.conf"
+    fi
+    chroot_run mkinitcpio -P
+
+    log "Creating user $USERNAME"
+    chroot_run useradd -m -G wheel -s /usr/bin/zsh "$USERNAME"
+    if [[ -n "$PASSWORD_HASH" ]]; then
+        printf '%s:%s\n' "$USERNAME" "$PASSWORD_HASH" | arch-chroot "$TARGET" chpasswd -e >>"$LOG" 2>&1 || die "chpasswd failed"
+    else
+        printf '%s:%s\n' "$USERNAME" "$PASSWORD" | arch-chroot "$TARGET" chpasswd >>"$LOG" 2>&1 || die "chpasswd failed"
+    fi
+    chroot_run passwd -l root
+    install -m 0440 /dev/stdin "$TARGET/etc/sudoers.d/10-wheel" <<<'%wheel ALL=(ALL:ALL) ALL'
+
+    chroot_run systemctl enable NetworkManager.service systemd-timesyncd.service fstrim.timer
+    if [[ -f "$TARGET/usr/share/devos/greetd/config.toml" ]]; then
+        # DESK-010: greetd + tuigreet, keyring unlocked at login.
+        install -m 0644 "$TARGET/usr/share/devos/greetd/config.toml" "$TARGET/etc/greetd/config.toml"
+        install -m 0644 "$TARGET/usr/share/devos/greetd/pam-greetd" "$TARGET/etc/pam.d/greetd"
+        chroot_run systemctl enable greetd.service
+    fi
+}
+
+install_bootloader() {
+    log "Installing GRUB with the DevOS theme"
+    apply_grub_defaults "$TARGET"
+    if [[ "$ENCRYPT" == yes ]]; then
+        local uuid
+        uuid="$(blkid -s UUID -o value "$ROOTPART")"
+        sed -i "s|^GRUB_CMDLINE_LINUX=.*|GRUB_CMDLINE_LINUX=\"rd.luks.name=$uuid=root root=/dev/mapper/root\"|" \
+            "$TARGET/etc/default/grub"
+    fi
+    chroot_run grub-install --target=x86_64-efi --efi-directory=/boot --bootloader-id=DevOS
+    # Fallback path as well (BOOTX64.EFI): some firmware ignores NVRAM entries (INST-003).
+    chroot_run grub-install --target=x86_64-efi --efi-directory=/boot --removable
+    chroot_run grub-mkconfig -o /boot/grub/grub.cfg
+}
+
+# The live system reads [devos] from the ISO (file:///opt/devos-repo); the installed
+# system gets the published repository URL from /etc/devos/repo-url (OS-011).
+install_pacman_conf() {
+    local url=""
+    [[ -r /etc/devos/repo-url ]] && url="$(head -1 /etc/devos/repo-url)"
+    if [[ -n "$url" ]]; then
+        sed "s|^Server = file:///opt/devos-repo$|Server = $url|" /etc/pacman.conf >"$TARGET/etc/pacman.conf"
+    else
+        # No published repository yet: keep the installed system on the official repos only.
+        sed '/^\[devos\]/,/^$/d' /etc/pacman.conf >"$TARGET/etc/pacman.conf"
+    fi
+}
+
+# Merge DevOS GRUB settings into /etc/default/grub (BOOT-010).
+apply_grub_defaults() {
+    local root="$1" file="$1/etc/default/grub" key line
+    [[ -f "$root$DEVOS_GRUB_DEFAULTS" ]] || die "devos-grub-theme is not installed in $root"
+    while IFS= read -r line; do
+        [[ "$line" =~ ^(GRUB_[A-Z_]+)= ]] || continue
+        key="${BASH_REMATCH[1]}"
+        if grep -q "^#\?$key=" "$file"; then
+            sed -i "s|^#\?$key=.*|${line//|/\\|}|" "$file"
+        else
+            echo "$line" >>"$file"
+        fi
+    done <"$root$DEVOS_GRUB_DEFAULTS"
+}
+
+finish() {
+    cp "$LOG" "$TARGET/var/log/devos-install.log"   # INST-006: contains no passwords
+    sync
+    umount -R "$TARGET"
+    [[ "$ENCRYPT" == yes ]] && cryptsetup close root
+    log "DevOS is installed. Remove the installation medium and reboot."
+}
+
+post_install() {
+    TARGET="$1"
+    [[ -d "$TARGET/etc" ]] || die "$TARGET does not look like an installed system"
+    log "Applying the DevOS layer to $TARGET"
+    install_pacman_conf
+    chroot_run pacman -Sy --needed --noconfirm "${DEVOS_PACKAGES[@]}"
+    if [[ -d "$TARGET/boot/grub" ]]; then
+        apply_grub_defaults "$TARGET"
+        chroot_run grub-mkconfig -o /boot/grub/grub.cfg
+    else
+        log "GRUB is not installed in $TARGET; skipped the boot theme"
+    fi
+    log "Done."
+}
+
+main() {
+    : >"$LOG"
+    chmod 600 "$LOG"
+    case "${1:-}" in
+        --post) preflight; [[ -n "${2:-}" ]] || die "usage: devos-install --post /mnt"; post_install "$2"; exit ;;
+        --config) preflight; load_config "${2:?usage: devos-install --config FILE}" ;;
+        "") preflight; interactive ;;
+        -h|--help) sed -n '2,13p' "$0"; exit ;;
+        *) die "unknown option: $1" ;;
+    esac
+    validate
+    check_network
+    confirm
+    log "Installing DevOS to $DISK (hostname $HOSTNAME_, user $USERNAME, encryption $ENCRYPT)"
+    partition
+    install_base
+    configure_system
+    install_bootloader
+    finish
+}
+
+main "$@"

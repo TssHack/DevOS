@@ -1,0 +1,22 @@
+# Maintainer: Ehsan Fazli
+# DevOS developer profiles (SRS §9.2): one metapackage per developer/profiles/<name>.list.
+
+_profiles=(general web backend systems ai embedded)
+pkgbase=devos-profiles
+pkgname=("${_profiles[@]/#/devos-profile-}")
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='DevOS developer profiles'
+arch=('any')
+url='https://github.com/DevOS'
+license=('GPL-3.0-or-later')
+source=()
+
+_list() { grep -vE '^\s*(#|$)' "$startdir/../../developer/profiles/$1.list"; }
+
+for _p in "${_profiles[@]}"; do
+    eval "package_devos-profile-$_p() {
+        pkgdesc='DevOS developer profile: $_p'
+        depends=(\$(_list $_p))
+    }"
+done
