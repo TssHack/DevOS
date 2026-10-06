@@ -1,0 +1,10 @@
+NAME="DevOS"
+PRETTY_NAME="DevOS %DEVOS_VERSION% (Live)"
+ID=devos
+ID_LIKE=arch
+VERSION_ID=%DEVOS_VERSION%
+BUILD_ID=rolling
+ANSI_COLOR="38;2;45;212;191"
+HOME_URL="https://github.com/DevOS"
+DOCUMENTATION_URL="https://github.com/DevOS"
+LOGO=devos

@@ -1,0 +1,7 @@
+
+Welcome to the DevOS live environment.
+
+  Network     Ethernet connects automatically. For Wi-Fi run: nmtui
+  Install     devos-install
+  Docs        https://github.com/DevOS
+

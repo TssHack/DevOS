@@ -1,0 +1,15 @@
+# Build outputs
+/dist/
+/work/
+/repo/
+
+# Python
+__pycache__/
+*.pyc
+
+# makepkg downloads (build-repo.sh uses work/sources; this guards manual makepkg runs)
+/packaging/*/src/
+/packaging/*/pkg/
+/packaging/devos-desktop/dots-hyprland/
+/packaging/devos-quickshell/quickshell/
+*.pkg.tar.zst

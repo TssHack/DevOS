@@ -1,0 +1,61 @@
+# DevOS live ISO — package list (x86_64)
+#
+# Rules (SRS §9.3): official Arch repositories or the [devos] repo only; every
+# entry is needed by a requirement. Checked by scripts/check-packages.sh.
+# Phase 1.0 scope: bootable, networked live system that can install Arch/DevOS.
+# Desktop (Phase 1.1) and developer toolchains (Phase 1.2) are added later.
+
+# --- Base system (OS-001..004) ---
+base
+linux
+linux-firmware
+sof-firmware
+intel-ucode
+amd-ucode
+mkinitcpio
+mkinitcpio-archiso
+sudo
+
+# --- Boot (OS-005, BOOT-*) ---
+grub
+efibootmgr
+memtest86+-efi
+
+# --- Networking (OS-006) ---
+networkmanager
+openssh
+wireless-regdb
+
+# --- Installation (INST-*) ---
+archinstall
+arch-install-scripts
+dosfstools
+e2fsprogs
+btrfs-progs
+exfatprogs
+ntfs-3g
+cryptsetup
+lvm2
+gptfdisk
+parted
+pacman-contrib
+
+# --- Live shell and rescue tools ---
+zsh
+grml-zsh-config
+neovim
+less
+man-db
+man-pages
+git
+curl
+rsync
+htop
+pv
+lsof
+pciutils
+usbutils
+smartmontools
+nvme-cli
+# --- DevOS (from the [devos] repository) ---
+devos-installer
