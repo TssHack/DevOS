@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="980" height="220" viewBox="0 0 980 220">
+  <defs>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+    <linearGradient id="accentText" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#2DD4BF"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+    <linearGradient id="markFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#121A29"/>
+      <stop offset="1" stop-color="#0A0F19"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+  </defs>
+  <!-- mark -->
+  <g transform="translate(16,46)">
+    <rect x="4" y="4" width="120" height="120" rx="32" fill="url(#accent)" opacity="0.35" filter="url(#glow)"/>
+    <rect x="4" y="4" width="120" height="120" rx="32" fill="url(#markFill)" stroke="url(#accent)" stroke-width="3"/>
+    <path d="M40 42 L64 64 L40 86" fill="none" stroke="url(#accent)" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="72" y1="88" x2="94" y2="88" stroke="#E6EDF7" stroke-width="10" stroke-linecap="round"/>
+  </g>
+  <!-- wordmark -->
+  <text x="176" y="140" font-family="Space Grotesk" font-weight="700" font-size="104" letter-spacing="-3" fill="#E9EEF7">Dev<tspan fill="url(#accentText)">OS</tspan></text>
+  <text x="182" y="186" font-family="JetBrains Mono, JetBrainsMono Nerd Font" font-weight="500" font-size="19" letter-spacing="5.5" fill="#7F8BA1">AI-NATIVE DEVELOPER OS</text>
+</svg>

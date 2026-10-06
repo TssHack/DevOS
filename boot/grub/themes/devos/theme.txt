@@ -1,0 +1,104 @@
+# DevOS GRUB theme
+#
+# Source of truth for layout. Rendered into boot/grub/themes/devos/ by
+# scripts/render-grub-theme.sh, which replaces @LOGO_*@ with the logo size.
+# The content block (logo, menu, countdown) is ~690 px tall and vertically
+# centred, so the layout holds from 1024x768 to 1920x1080 and beyond; the
+# background is cropped, never stretched.
+#
+# GRUB draws a styled box's border pieces *outside* the area it wraps:
+#   selected box height = item_height + 2 x 12 (select corner) = 58
+#   item pitch          = item_height + item_spacing        = 58
+#   menu height         = 7 items x 58 + 2 x 20 (menu corner) = 446 at 1080p
+# Menu height and everything below it carry a small percentage term so the
+# countdown and key hints still fit at 1280x720 (menu = 5%+392, 7 rows from
+# 720p up; more entries scroll).
+
+title-text: ""
+desktop-image: "background.jpg"
+desktop-image-scale-method: "crop"
+desktop-image-h-align: "center"
+desktop-image-v-align: "center"
+desktop-color: "#070A11"
+
+message-font: "DevOS Mono Regular 16"
+message-color: "#C9D3E3"
+message-bg-color: "#070A11"
+
+terminal-font: "DevOS Mono Regular 16"
+terminal-box: "terminal_box_*.png"
+terminal-left: "50%-460"
+terminal-top: "12%"
+terminal-width: "920"
+terminal-height: "76%"
+terminal-border: "0"
+
+# Brand lockup
++ image {
+    file = "logo.png"
+    left = 50%-213
+    top = 50%-345
+    width = 427
+    height = 153
+}
+
+# Boot menu
++ boot_menu {
+    left = 50%-380
+    top = 50%-165
+    width = 760
+    height = 5%+392
+    menu_pixmap_style = "menu_*.png"
+    item_font = "DevOS Mono Regular 20"
+    item_color = "#A9B4C7"
+    selected_item_font = "DevOS Mono Bold 20"
+    selected_item_color = "#FFFFFF"
+    selected_item_pixmap_style = "select_*.png"
+    icon_width = 32
+    icon_height = 32
+    item_icon_space = 16
+    item_height = 34
+    item_padding = 14
+    item_spacing = 24
+    scrollbar = true
+    scrollbar_width = 8
+    scrollbar_frame = "scrollbar_frame_*.png"
+    scrollbar_thumb = "scrollbar_thumb_*.png"
+}
+
+# Countdown (hidden by GRUB once the user presses a key)
++ label {
+    id = "__timeout__"
+    left = 50%-380
+    width = 760
+    top = 55%+255
+    height = 24
+    align = "center"
+    font = "DevOS Mono Regular 16"
+    color = "#7F8BA1"
+    text = "Booting the selected entry in %d s"
+}
+
++ progress_bar {
+    id = "__timeout__"
+    left = 50%-160
+    width = 320
+    top = 55%+281
+    height = 20
+    font = "DevOS Mono Regular 16"
+    show_text = false
+    bar_style = "progress_bar_*.png"
+    highlight_style = "progress_highlight_*.png"
+}
+
+# Key hints
++ label {
+    left = 0
+    width = 100%
+    top = 100%-28
+    height = 24
+    align = "center"
+    font = "DevOS Mono Regular 16"
+    color = "#5C6880"
+    text = "↑↓ select   ·   Enter boot   ·   E edit   ·   C console"
+}

@@ -1,0 +1,15 @@
+# DevOS settings for /etc/default/grub on installed systems (SRS BOOT-010).
+# devos-install merges these keys into /etc/default/grub, then runs grub-mkconfig.
+# grub-mkconfig loads every *.pf2 in the theme directory automatically.
+
+GRUB_DISTRIBUTOR="DevOS"
+GRUB_DEFAULT=0
+GRUB_TIMEOUT=3
+GRUB_TIMEOUT_STYLE=menu
+GRUB_TERMINAL_OUTPUT=gfxterm
+GRUB_GFXMODE=1920x1080,1600x900,1366x768,1280x800,1024x768,auto
+GRUB_GFXPAYLOAD_LINUX=keep
+GRUB_THEME="/usr/share/grub/themes/devos/theme.txt"
+GRUB_CMDLINE_LINUX_DEFAULT="quiet loglevel=3 rd.udev.log_level=3"
+GRUB_DISABLE_RECOVERY=true
+GRUB_DISABLE_OS_PROBER=false
